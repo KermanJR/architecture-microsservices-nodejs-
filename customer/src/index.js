@@ -1,37 +1,25 @@
 const express = require('express');
 const { PORT } = require('./config');
-const { databaseConnection } = require('./database');
+const { connectDB, sequelize } = require('./database/connection');
 const expressApp = require('./express-app');
-const { CreateChannel } = require('./utils')
+require('dotenv').config();
 
-const StartServer = async() => {
 
+
+const StartServer = async () => {
+  
     const app = express();
-    
-    await databaseConnection();
-
-    const channel = await CreateChannel()
-    if (!channel) {
-        console.error('Failed to create channel');
-        process.exit(1);
-    }
-
-
-    await expressApp(app, channel);
-    
+    await connectDB();
+    await expressApp(app);
+    await sequelize.sync();
+    console.log('Database synchronized')
 
     app.listen(PORT, () => {
-          console.log(`listening to port ${PORT}`);
-    })
-    .on('error', (err) => {
+        console.log(`listening to port ${PORT}`);
+    }).on('error', (err) => {
         console.log(err);
         process.exit();
-    })
-    .on('close', () => {
-        channel.close();
-    })
-    
-
+    });
 }
 
 StartServer();

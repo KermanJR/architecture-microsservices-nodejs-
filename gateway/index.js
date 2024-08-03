@@ -3,6 +3,7 @@ const cors = require("cors");
 const proxy = require("express-http-proxy");
 const swaggerUi = require("swagger-ui-express");
 const swaggerJsdoc = require("swagger-jsdoc");
+require('dotenv').config();
 
 const app = express();
 
@@ -21,18 +22,24 @@ const swaggerOptions = {
             {
                 url: "http://localhost:8000",
                 description: "Gateway Server"
+            },
+            {
+                url: "http://localhost:8001",
+                description: "Customer Server"
             }
         ]
     },
-    apis: ["./customer.js"] 
+    apis: ["./customer.js"] // Certifique-se de que este caminho está correto e o arquivo contém a documentação do Swagger
 };
 
 const swaggerDocs = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
-app.use("/customer", proxy("http://localhost:8001"));
+//app.use("/customer", proxy("http://localhost:8001"));
 app.use("/shopping", proxy("http://localhost:8003"));
 app.use("/", proxy("http://localhost:8002")); 
+
+
 
 app.listen(8000, () => {
   console.log("Gateway is Listening to Port 8000");

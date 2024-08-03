@@ -1,59 +1,5 @@
-version: "3"
+version: "3.8"
 services:
-  nosql-db:
-    image: mvertes/alpine-mongo
-    ports:
-      - "27018:27017"
-    container_name: nosql-db
-    volumes:
-      - ./db/:/data/db
-
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    container_name: rabbitmq
-    ports:
-      - '5672:5672'
-      - '15672:15672'
-    environment:
-      - RABBITMQ_DEFAULT_USER=user
-      - RABBITMQ_DEFAULT_PASS=password
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-
-  products:
-    build:
-      dockerfile: Dockerfile
-      context: ./products
-    container_name: products
-    ports:
-      - "8002:8002"
-    restart: always
-    depends_on:
-      - "nosql-db"
-      - "rabbitmq"
-    volumes:
-      - .:/app
-      - /app/products/node_modules
-    env_file:
-      - ./products/.env.dev
-
-  shopping:
-    build:
-      dockerfile: Dockerfile
-      context: ./shopping
-    container_name: shopping
-    ports:
-      - "8003:8003"
-    restart: always
-    depends_on:
-      - "nosql-db"
-      - "rabbitmq"
-    volumes:
-      - .:/app
-      - /app/shopping/node_modules
-    env_file:
-      - ./shopping/.env.dev
-
   customer:
     build:
       dockerfile: Dockerfile
@@ -63,8 +9,7 @@ services:
       - "8001:8001"
     restart: always
     depends_on:
-      - "nosql-db"
-      - "rabbitmq"
+      - db
     volumes:
       - .:/app
     env_file:
@@ -78,8 +23,6 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - products
-      - shopping
       - customer
     volumes:
       - .:/app
@@ -87,14 +30,25 @@ services:
     env_file:
       - ./gateway/.env.dev
 
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: mydatabase
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
   nginx-proxy:
     build:
       dockerfile: Dockerfile
       context: ./proxy
     depends_on:
       - gateway
+      - customer
+      - db
     ports:
       - 80:80
-
 volumes:
-  rabbitmq_data:
+  pgdata:

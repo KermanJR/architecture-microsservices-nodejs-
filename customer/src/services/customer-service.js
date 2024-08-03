@@ -1,135 +1,76 @@
-const { CustomerRepository } = require("../database");
-const { FormateData, GeneratePassword, GenerateSalt, GenerateSignature, ValidatePassword, PublishMessage } = require('../utils');
+const customerRepository = require('../database/repository/customer-repository');
+const { FormateData, GeneratePassword, GenerateSalt, GenerateSignature, ValidatePassword } = require('../utils');
 
+const signIn = async (userInputs) => {
+    const { email, password } = userInputs;
+    const existingCustomer = await customerRepository.FindCustomer({ email });
 
-// All Business logic will be here
-class CustomerService {
-
-    constructor(channel){
-        this.repository = new CustomerRepository();
-        this.channel = channel;
-    }
-
-    async SignIn(userInputs){
-
-        const { email, password } = userInputs;
-        
-        const existingCustomer = await this.repository.FindCustomer({ email});
-
-        if(existingCustomer){
-            
-            const validPassword = await ValidatePassword(password, existingCustomer.password, existingCustomer.salt);
-            if(validPassword){
-                const token = await GenerateSignature({ email: existingCustomer.email, _id: existingCustomer._id});
-                return FormateData({id: existingCustomer._id, token });
-            }
+    if (existingCustomer) {
+        const validPassword = await ValidatePassword(password, existingCustomer.password, existingCustomer.salt);
+        if (validPassword) {
+            const token = await GenerateSignature({ email: existingCustomer.email, _id: existingCustomer.id });
+            return FormateData({ id: existingCustomer.id, token });
         }
-
-        return FormateData(null);
     }
 
-   
-    async SignUp(userInputs){
-        const { email, password, phone } = userInputs;
+    return FormateData(null);
+};
 
-        const existingCustomer = await this.repository.FindCustomer({ email });
-        if(existingCustomer){
-            return FormateData({ error: 'Customer already exists' });
-        }
+const signUp = async (userInputs) => {
+    const { email, password, phone } = userInputs;
+    const existingCustomer = await customerRepository.FindCustomer({ email });
 
-        let salt = await GenerateSalt();
-        let userPassword = await GeneratePassword(password, salt);
-
-        const newCustomer = await this.repository.CreateCustomer({ email, password: userPassword, phone, salt });
-
-        const token = await GenerateSignature({ email: email, _id: newCustomer._id });
-
-        // Enviar mensagem ao RabbitMQ
-        const payload = {
-            event: 'CUSTOMER_REGISTERED',
-            data: { id: newCustomer._id, email, phone }
-        };
-        PublishMessage(this.channel, 'customer_service', JSON.stringify(payload));
-
-        return FormateData({ id: newCustomer._id, token });
+    if (existingCustomer) {
+        return FormateData({ error: 'Customer already exists' });
     }
 
-    async AddNewAddress(_id,userInputs){
-        
-        const { street, postalCode, city,country} = userInputs;
-    
-        const addressResult = await this.repository.CreateAddress({ _id, street, postalCode, city,country})
+    let salt = await GenerateSalt();
+    let userPassword = await GeneratePassword(password, salt);
 
-        return FormateData(addressResult);
-    }
+    const newCustomer = await customerRepository.CreateCustomer({ email, password: userPassword, phone, salt });
+    const token = await GenerateSignature({ email: email, _id: newCustomer.id });
 
-    async GetProfile(id){
+    return FormateData({ id: newCustomer.id, token });
+};
 
-        const existingCustomer = await this.repository.FindCustomerById({id});
-        return FormateData(existingCustomer);
-    }
+const addNewAddress = async (customerId, userInputs) => {
+    const { street, postalCode, city, country } = userInputs;
+    const addressResult = await customerRepository.CreateAddress({ customerId, street, postalCode, city, country });
+    return FormateData(addressResult);
+};
 
-    async GetShopingDetails(id){
+const getProfile = async (id) => {
+    const existingCustomer = await customerRepository.FindCustomerById(id);
+    return FormateData(existingCustomer);
+};
 
-        const existingCustomer = await this.repository.FindCustomerById({id});
+const getWishlist = async (customerId) => {
+    const wishListItems = await customerRepository.Wishlist(customerId);
+    return FormateData(wishListItems);
+};
 
-        if(existingCustomer){
-            // const orders = await this.shopingRepository.Orders(id);
-           return FormateData(existingCustomer);
-        }       
-        return FormateData({ msg: 'Error'});
-    }
+const addToWishlist = async (customerId, product) => {
+    const wishlistResult = await customerRepository.AddWishlistItem(customerId, product);
+    return FormateData(wishlistResult);
+};
 
-    async GetWishList(customerId){
-        const wishListItems = await this.repository.Wishlist(customerId);
-        return FormateData(wishListItems);
-    }
+const manageCart = async (customerId, product, qty, isRemove) => {
+    const cartResult = await customerRepository.AddCartItem(customerId, product, qty, isRemove);
+    return FormateData(cartResult);
+};
 
-    async AddToWishlist(customerId, product){
-         const wishlistResult = await this.repository.AddWishlistItem(customerId, product);        
-        return FormateData(wishlistResult);
-    }
+const manageOrder = async (customerId, order) => {
+    const orderResult = await customerRepository.AddOrderToProfile(customerId, order);
+    return FormateData(orderResult);
+};
 
-    async ManageCart(customerId, product, qty, isRemove){
-        const cartResult = await this.repository.AddCartItem(customerId, product, qty, isRemove);        
-       return FormateData(cartResult);
-    }
-
-    async ManageOrder(customerId, order){
-        const orderResult = await this.repository.AddOrderToProfile(customerId, order);
-        return FormateData(orderResult);
-    }
-
-    async SubscribeEvents(payload){
- 
-        console.log('Triggering.... Customer Events')
-
-        payload = JSON.parse(payload)
-
-        const { event, data } =  payload;
-
-        const { userId, product, order, qty } = data;
-
-        switch(event){
-            case 'ADD_TO_WISHLIST':
-            case 'REMOVE_FROM_WISHLIST':
-                this.AddToWishlist(userId,product)
-                break;
-            case 'ADD_TO_CART':
-                this.ManageCart(userId,product, qty, false);
-                break;
-            case 'REMOVE_FROM_CART':
-                this.ManageCart(userId,product,qty, true);
-                break;
-            case 'CREATE_ORDER':
-                this.ManageOrder(userId,order);
-                break;
-            default:
-                break;
-        }
- 
-    }
-
-}
-
-module.exports = CustomerService;
+module.exports = {
+    signIn,
+    signUp,
+    addNewAddress,
+    getProfile,
+    getWishlist,
+    addToWishlist,
+    manageCart,
+    manageOrder
+};

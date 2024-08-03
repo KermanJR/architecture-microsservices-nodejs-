@@ -2,17 +2,15 @@ FROM node
 
 WORKDIR /app/customer
 
-# Copia apenas os arquivos package.json e package-lock.json primeiro
+# Copie os arquivos package.json e package-lock.json para o contêiner
 COPY package*.json ./
 
-# Instala as dependências, incluindo o bcrypt
+# Instale todas as dependências
 RUN npm install
 
-# Copia o restante do código da aplicação
+# Copie o restante do código da aplicação para o contêiner
 COPY . .
 
-# Exponha a porta do serviço
 EXPOSE 8001
 
-# Comando para iniciar a aplicação
 CMD ["npm", "start"]

@@ -1,6 +1,14 @@
-const CustomerService = require('../services/customer-service');
+const { 
+    signIn, 
+    signUp, 
+    addNewAddress, 
+    getProfile, 
+    getWishlist, 
+    addToWishlist, 
+    manageCart, 
+    manageOrder 
+} = require('../services/customer-service');
 const UserAuth = require('./middlewares/auth');
-const { SubscribeMessage } = require('../utils');
 
 /**
  * @swagger
@@ -9,12 +17,14 @@ const { SubscribeMessage } = require('../utils');
  *   description: Customer management
  */
 
-module.exports = (app, channel) => {
-    
-    const service = new CustomerService(channel);
+module.exports = (app) => {
 
-    // To listen
-    SubscribeMessage(channel, service);
+     // Middleware de log para todas as requisições
+     app.use((req, res, next) => {
+        console.log(`Customer Service - Request URL: ${req.originalUrl}`);
+        console.log(`Customer Service - Request Method: ${req.method}`);
+        next();
+    });
 
     /**
      * @swagger
@@ -52,9 +62,9 @@ module.exports = (app, channel) => {
      *       400:
      *         description: Bad request
      */
-    app.post('/signup', async (req, res, next) => {
+    app.post('customer/signup', async (req, res, next) => {
         const { email, password, phone } = req.body;
-        const result = await service.SignUp({ email, password, phone });
+        const result = await signUp({ email, password, phone });
         if (result.error) {
             return res.status(400).json(result);
         }
@@ -93,10 +103,10 @@ module.exports = (app, channel) => {
      *       400:
      *         description: Bad request
      */
-    app.post('/login',  async (req,res,next) => {
+    app.post('/login', async (req, res, next) => {
         const { email, password } = req.body;
-        const { data } = await service.SignIn({ email, password});
-        res.json(data);
+        const result = await signIn({ email, password });
+        res.json(result);
     });
 
     /**
@@ -143,11 +153,11 @@ module.exports = (app, channel) => {
      *       401:
      *         description: Unauthorized
      */
-    app.post('/address', UserAuth, async (req,res,next) => {
+    app.post('/address', UserAuth, async (req, res, next) => {
         const { _id } = req.user;
         const { street, postalCode, city, country } = req.body;
-        const { data } = await service.AddNewAddress( _id ,{ street, postalCode, city, country });
-        res.json(data);
+        const result = await addNewAddress(_id, { street, postalCode, city, country });
+        res.json(result);
     });
 
     /**
@@ -168,10 +178,10 @@ module.exports = (app, channel) => {
      *       401:
      *         description: Unauthorized
      */
-    app.get('/profile', UserAuth ,async (req,res,next) => {
+    app.get('/profile', UserAuth, async (req, res, next) => {
         const { _id } = req.user;
-        const { data } = await service.GetProfile({ _id });
-        res.json(data);
+        const result = await getProfile(_id);
+        res.json(result);
     });
 
     /**
@@ -192,10 +202,10 @@ module.exports = (app, channel) => {
      *       401:
      *         description: Unauthorized
      */
-    app.get('/shoping-details', UserAuth, async (req,res,next) => {
+    app.get('/shoping-details', UserAuth, async (req, res, next) => {
         const { _id } = req.user;
-        const { data } = await service.GetShopingDetails(_id);
-        return res.json(data);
+        const result = await getShoppingDetails(_id);
+        return res.json(result);
     });
 
     /**
@@ -216,10 +226,10 @@ module.exports = (app, channel) => {
      *       401:
      *         description: Unauthorized
      */
-    app.get('/wishlist', UserAuth, async (req,res,next) => {
+    app.get('/wishlist', UserAuth, async (req, res, next) => {
         const { _id } = req.user;
-        const { data } = await service.GetWishList( _id);
-        return res.status(200).json(data);
+        const result = await getWishlist(_id);
+        return res.status(200).json(result);
     });
 
     /**
@@ -236,7 +246,7 @@ module.exports = (app, channel) => {
      *             schema:
      *               type: object
      */
-    app.get('/whoami', (req,res,next) => {
-        return res.status(200).json({msg: '/customer : I am Customer Service'})
+    app.get('/whoami', (req, res, next) => {
+        return res.status(200).json({ msg: '/customer : I am Customer Service' });
     });
-}
+};
