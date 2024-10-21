@@ -1,54 +1,71 @@
 version: "3.8"
+
 services:
-  customer:
-    build:
-      dockerfile: Dockerfile
-      context: ./customer
-    container_name: customer
+  auth:
+    build: ./auth
     ports:
-      - "8001:8001"
-    restart: always
-    depends_on:
-      - db
-    volumes:
-      - .:/app
+      - "3000:3000"
     env_file:
-      - ./customer/.env.dev
+      - ./auth/.env
+    networks:
+      - ecommerce
 
-  gateway:
-    build:
-      dockerfile: Dockerfile
-      context: ./gateway
-    container_name: gateway
+  order:
+    build: ./order
     ports:
-      - "8000:8000"
+      - "3002:3002"
     depends_on:
-      - customer
-    volumes:
-      - .:/app
-      - /app/gateway/node_modules
-    env_file:
-      - ./gateway/.env.dev
-
-  db:
-    image: postgres:13
+      - mongo
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
-      POSTGRES_DB: mydatabase
+      - MONGODB_URI=mongodb://mongo:27017/orderdb
+    env_file:
+      - ./order/.env
+    networks:
+      - ecommerce
+
+  product:
+    build: ./product
     ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-  nginx-proxy:
-    build:
-      dockerfile: Dockerfile
-      context: ./proxy
+      - "3001:3001"
     depends_on:
-      - gateway
-      - customer
-      - db
+      - mongo
+      - redis
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/productdb
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    env_file:
+      - ./product/.env
+    networks:
+      - ecommerce
+
+  api-gateway:
+    build: ./api-gateway
     ports:
-      - 80:80
+      - "3003:3003"
+    networks:
+      - ecommerce
+
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db11
+    networks:
+      - ecommerce
+
+  redis:
+    image: redis:7.4.0-alpine
+    environment:
+      - REDIS_URL=redis://redis
+    ports:
+      - "6379:6379"
+    networks:
+      - ecommerce
+
+networks:
+  ecommerce:
+
 volumes:
-  pgdata:
+  mongo-data:
